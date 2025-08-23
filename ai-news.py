@@ -83,7 +83,6 @@ def main():
         return
 
     configuration = Configuration(access_token=channel_access_token)
-
     message_text = get_ai_news()
 
     print(f"準備發送訊息:\n---\n{message_text}\n---")
