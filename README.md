@@ -49,7 +49,7 @@ GEMINI_API_KEY="你的 Gemini API Key"
 完成設定後，直接執行主程式即可：
 
 ```bash
-python chat.py
+python ai-news.py
 ```
 
 腳本會執行一次，發送新聞摘要後即結束。
@@ -60,5 +60,5 @@ python chat.py
 
 ```bash
 # 輸入 crontab -e，並加入以下這行
-0 9 * * * /path/to/your/project/venv/bin/python /path/to/your/project/chat.py
+0 9 * * * /path/to/your/project/venv/bin/python /path/to/your/project/ai-news.py
 ```
