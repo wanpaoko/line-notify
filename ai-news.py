@@ -73,7 +73,8 @@ def get_ai_news():
 
 def markdown_to_confluence_storage(markdown_text):
     """
-    將 Markdown 格式轉換為 Confluence storage 格式 (簡化版)
+    將 Markdown 格式轉換為現代 Confluence Storage 格式 (XHTML)
+    符合 Confluence Cloud 新版編輯器
     """
     lines = markdown_text.split('\n')
     result_lines = []
@@ -85,28 +86,36 @@ def markdown_to_confluence_storage(markdown_text):
             if in_list:
                 result_lines.append('</ul>')
                 in_list = False
-            result_lines.append(f'<h3>{line[4:]}</h3>')
+            # 使用 Confluence 標準的標題格式
+            result_lines.append(f'<h3>{escape_html(line[4:])}</h3>')
         elif line.startswith('## '):
             if in_list:
                 result_lines.append('</ul>')
                 in_list = False
-            result_lines.append(f'<h2>{line[3:]}</h2>')
+            result_lines.append(f'<h2>{escape_html(line[3:])}</h2>')
         elif line.startswith('# '):
             if in_list:
                 result_lines.append('</ul>')
                 in_list = False
-            result_lines.append(f'<h1>{line[2:]}</h1>')
+            result_lines.append(f'<h1>{escape_html(line[2:])}</h1>')
         # 處理列表
         elif line.strip().startswith('- ') or line.strip().startswith('* '):
             if not in_list:
                 result_lines.append('<ul>')
                 in_list = True
             content = line.strip()[2:]
-            # 處理內嵌的粗體和斜體
-            content = content.replace('**', '<strong>').replace('**', '</strong>')
-            content = content.replace('*', '<em>').replace('*', '</em>')
-            result_lines.append(f'<li>{content}</li>')
-        # 處理水平線
+            # 處理行內格式
+            content = process_inline_formatting(content)
+            result_lines.append(f'<li><p>{content}</p></li>')
+        # 處理數字列表
+        elif re.match(r'^\d+\.\s+', line.strip()):
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            content = re.sub(r'^\d+\.\s+', '', line.strip())
+            content = process_inline_formatting(content)
+            result_lines.append(f'<ol><li><p>{content}</p></li></ol>')
+        # 處理水平線 - 使用 Confluence 宏
         elif line.strip() == '---':
             if in_list:
                 result_lines.append('</ul>')
@@ -117,21 +126,15 @@ def markdown_to_confluence_storage(markdown_text):
             if in_list:
                 result_lines.append('</ul>')
                 in_list = False
-            result_lines.append('<p></p>')
+            # 空行不輸出任何內容，讓段落自然分隔
+            continue
         # 一般文字（可能包含格式）
         else:
             if in_list:
                 result_lines.append('</ul>')
                 in_list = False
             # 處理行內格式
-            formatted_line = line
-            # 處理粗體
-            while '**' in formatted_line:
-                formatted_line = formatted_line.replace('**', '<strong>', 1)
-                formatted_line = formatted_line.replace('**', '</strong>', 1)
-            # 處理斜體 (單 *)
-            formatted_line = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', formatted_line)
-
+            formatted_line = process_inline_formatting(line)
             result_lines.append(f'<p>{formatted_line}</p>')
 
     # 關閉未結束的列表
@@ -139,6 +142,29 @@ def markdown_to_confluence_storage(markdown_text):
         result_lines.append('</ul>')
 
     return '\n'.join(result_lines)
+
+
+def escape_html(text):
+    """轉義 HTML 特殊字元"""
+    return (text.replace('&', '&amp;')
+                .replace('<', '&lt;')
+                .replace('>', '&gt;')
+                .replace('"', '&quot;')
+                .replace("'", '&#x27;'))
+
+
+def process_inline_formatting(text):
+    """處理行內格式（粗體、斜體、連結等）"""
+    # 處理粗體 **text**
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+    # 處理斜體 *text* (但不要匹配已經處理過的)
+    text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<em>\1</em>', text)
+    # 處理程式碼 `code`
+    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
+    # 處理連結 [text](url)
+    text = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', text)
+
+    return text
 
 
 def create_confluence_child_page(parent_page_id, title, content):
