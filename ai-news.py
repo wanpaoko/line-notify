@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
@@ -49,9 +50,9 @@ def get_ai_news():
             max_output_tokens=2000
         )
 
-        # 呼叫 Gemini API (使用穩定的 2.5 Flash)
+        # 呼叫 Gemini API (使用穩定的 3 Flash)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             contents=prompt_text,
             config=config
         )
@@ -70,6 +71,76 @@ def get_ai_news():
         return None, f"處理新聞時發生錯誤: {e}"
 
 
+def markdown_to_confluence_storage(markdown_text):
+    """
+    將 Markdown 格式轉換為 Confluence storage 格式 (簡化版)
+    """
+    lines = markdown_text.split('\n')
+    result_lines = []
+    in_list = False
+
+    for i, line in enumerate(lines):
+        # 處理標題
+        if line.startswith('### '):
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            result_lines.append(f'<h3>{line[4:]}</h3>')
+        elif line.startswith('## '):
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            result_lines.append(f'<h2>{line[3:]}</h2>')
+        elif line.startswith('# '):
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            result_lines.append(f'<h1>{line[2:]}</h1>')
+        # 處理列表
+        elif line.strip().startswith('- ') or line.strip().startswith('* '):
+            if not in_list:
+                result_lines.append('<ul>')
+                in_list = True
+            content = line.strip()[2:]
+            # 處理內嵌的粗體和斜體
+            content = content.replace('**', '<strong>').replace('**', '</strong>')
+            content = content.replace('*', '<em>').replace('*', '</em>')
+            result_lines.append(f'<li>{content}</li>')
+        # 處理水平線
+        elif line.strip() == '---':
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            result_lines.append('<hr />')
+        # 處理空行
+        elif line.strip() == '':
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            result_lines.append('<p></p>')
+        # 一般文字（可能包含格式）
+        else:
+            if in_list:
+                result_lines.append('</ul>')
+                in_list = False
+            # 處理行內格式
+            formatted_line = line
+            # 處理粗體
+            while '**' in formatted_line:
+                formatted_line = formatted_line.replace('**', '<strong>', 1)
+                formatted_line = formatted_line.replace('**', '</strong>', 1)
+            # 處理斜體 (單 *)
+            formatted_line = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', formatted_line)
+
+            result_lines.append(f'<p>{formatted_line}</p>')
+
+    # 關閉未結束的列表
+    if in_list:
+        result_lines.append('</ul>')
+
+    return '\n'.join(result_lines)
+
+
 def create_confluence_child_page(parent_page_id, title, content):
     """
     在指定的父頁面下建立新的子頁面
@@ -80,20 +151,21 @@ def create_confluence_child_page(parent_page_id, title, content):
 
         today = datetime.now().strftime("%Y-%m-%d")
 
-        # 組合完整的頁面內容
-        full_content = f"""# {title}
-
-## 更新時間：{today}
+        # 組合完整的頁面內容 (Markdown)
+        markdown_content = f"""## 更新時間：{today}
 
 {content}
 
 ---
 
 *本頁面由自動化程式建立*
-*資料來源：Google Gemini 2.5 Flash API (with Google Search)*
+*資料來源：Google Gemini 3 Flash API (with Google Search)*
 """
         # 確保內容是有效的 UTF-8 編碼
-        full_content = full_content.encode('utf-8', errors='ignore').decode('utf-8')
+        markdown_content = markdown_content.encode('utf-8', errors='ignore').decode('utf-8')
+
+        # 轉換為 Confluence storage 格式
+        storage_content = markdown_to_confluence_storage(markdown_content)
 
         # 準備建立新頁面的資料
         data = {
@@ -109,8 +181,8 @@ def create_confluence_child_page(parent_page_id, title, content):
             ],
             "body": {
                 "storage": {
-                    "value": full_content,
-                    "representation": "wiki"  # Confluence 使用 wiki markup
+                    "value": storage_content,
+                    "representation": "storage"  # 使用 storage 格式
                 }
             }
         }
