@@ -1,276 +1,135 @@
 import os
 import re
-import requests
 from datetime import datetime
 from dotenv import load_dotenv
+import tomli
 from google import genai
 from google.genai import types
+from linebot.v3.messaging import (
+    Configuration, ApiClient, MessagingApi,
+    PushMessageRequest, TextMessage
+)
+from linebot.v3.messaging.exceptions import ApiException
 
 # --- 讀取 .env ---
 load_dotenv()
 
-# --- 從環境變數讀取設定 ---
-gemini_api_key = os.environ.get("GEMINI_API_KEY")
-confluence_url = os.environ.get("CONFLUENCE_URL", "https://trendmicro.atlassian.net")
-confluence_email = os.environ.get("CONFLUENCE_USERNAME")
-confluence_api_token = os.environ.get("CONFLUENCE_API_TOKEN")
-confluence_parent_page_id = os.environ.get("CONFLUENCE_PARENT_PAGE_ID", "1969488035")  # AI 頁面 ID
+# --- 讀取 TOML 設定 ---
+config_data = {}
+config_path = "config/config.toml"
+if os.path.exists(config_path):
+    with open(config_path, "rb") as f:
+        config_data = tomli.load(f)
 
+# --- 從環境變數或 TOML 讀取設定 ---
+channel_access_token = os.environ.get("CHANNEL_ACCESS_TOKEN")
+gemini_api_key = os.environ.get("GEMINI_API_KEY")
+
+# 優先從 config.toml 讀取 USER_ID (可能是 list 或 str)
+user_ids = config_data.get("news", {}).get("USER_ID") or os.environ.get("USER_ID")
+# 確保轉為 list
+if isinstance(user_ids, str):
+    user_ids = [user_ids]
+elif user_ids is None:
+    user_ids = []
 
 def get_ai_news():
     """
-    從 Gemini API 獲取最新 AI 新聞摘要（使用 Google Search grounding）
+    從 Gemini 2.5 + Google Search 獲取最新 AI 新聞摘要
     """
+
     today = datetime.now().strftime("%Y-%m-%d")
 
     if not gemini_api_key:
-        return None, "錯誤：尚未設定 GEMINI_API_KEY 環境變數。"
+        return "錯誤：尚未設定 GEMINI_API_KEY 環境變數。"
 
     try:
-        prompt_text = (
-            f"今天是 {today}，請搜尋並提供最近的5則AI/LLM的重要技術新聞或發展趨勢，"
-            f"以中文 Markdown 格式撰寫，包含：\n"
-            f"1. 每則新聞的標題（使用 ### 格式）\n"
-            f"2. 重點摘要（使用條列式）\n"
-            f"3. 如果有來源或參考資料請附上\n"
-            f"請確保格式清晰易讀。"
-        )
-
-        # 初始化 Gemini 客戶端
+        # 設定 Gemini API Client
         client = genai.Client(api_key=gemini_api_key)
 
-        # 配置 Google Search grounding
-        grounding_tool = types.Tool(
-            google_search=types.GoogleSearch()
+        prompt_text = (
+            f"今天是 {today}，請搜尋最近 5 則與 AI 或 LLM 相關的技術新聞。\n\n"
+            "請遵守以下格式規定：\n"
+            "1. 不要使用 [連結名稱](網址) 格式，請直接貼出完整的 URL。\n"
+            "每則新聞格式範例：\n"
+            "** [新聞標題] **\n"
+            "[簡短摘要]\n"
+            "[完整網址]\n"
         )
+
+        contents = [
+            types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=prompt_text)],
+            )
+        ]
+
+        # 啟用 Google Search 工具
+        tools = [types.Tool(googleSearch=types.GoogleSearch())]
 
         config = types.GenerateContentConfig(
-            tools=[grounding_tool],
-            temperature=0.7,
-            max_output_tokens=2000
+            thinking_config=types.ThinkingConfig(thinking_budget=-1),
+            tools=tools
         )
 
-        # 呼叫 Gemini API (使用穩定的 3 Flash)
-        response = client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=prompt_text,
+        # 使用 generate_content_stream 取得新聞摘要
+        news_summary = ""
+        for chunk in client.models.generate_content_stream(
+            model="gemini-2.5-flash",
+            contents=contents,
             config=config
-        )
+        ):
+            news_summary += chunk.text
 
-        # 提取回應內容
-        if response.text:
-            # 確保回應是有效的 UTF-8 編碼
-            content = response.text.strip()
-            # 移除可能的非 UTF-8 字元
-            content = content.encode('utf-8', errors='ignore').decode('utf-8')
-            return content, None
+        # 移除行首的 Markdown 清單符號 (例如 "* ", "- ")
+        news_summary = re.sub(r"^[ \t]*[*+-][ \t]+", "", news_summary, flags=re.MULTILINE)
+        # 清理多餘的空白行或開頭結尾空白
+        news_summary = news_summary.strip()
+
+        if news_summary:
+            return f"每日 AI 新聞摘要 🤖 ({today})\n\n{news_summary}"
         else:
-            return None, "目前找不到最新的 AI 新聞。"
+            return "目前找不到最新的 AI 新聞。"
 
     except Exception as e:
-        return None, f"處理新聞時發生錯誤: {e}"
-
-
-def markdown_to_confluence_storage(markdown_text):
-    """
-    將 Markdown 格式轉換為現代 Confluence Storage 格式 (XHTML)
-    符合 Confluence Cloud 新版編輯器
-    """
-    lines = markdown_text.split('\n')
-    result_lines = []
-    in_list = False
-
-    for i, line in enumerate(lines):
-        # 處理標題
-        if line.startswith('### '):
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            # 使用 Confluence 標準的標題格式
-            result_lines.append(f'<h3>{escape_html(line[4:])}</h3>')
-        elif line.startswith('## '):
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            result_lines.append(f'<h2>{escape_html(line[3:])}</h2>')
-        elif line.startswith('# '):
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            result_lines.append(f'<h1>{escape_html(line[2:])}</h1>')
-        # 處理列表
-        elif line.strip().startswith('- ') or line.strip().startswith('* '):
-            if not in_list:
-                result_lines.append('<ul>')
-                in_list = True
-            content = line.strip()[2:]
-            # 處理行內格式
-            content = process_inline_formatting(content)
-            result_lines.append(f'<li><p>{content}</p></li>')
-        # 處理數字列表
-        elif re.match(r'^\d+\.\s+', line.strip()):
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            content = re.sub(r'^\d+\.\s+', '', line.strip())
-            content = process_inline_formatting(content)
-            result_lines.append(f'<ol><li><p>{content}</p></li></ol>')
-        # 處理水平線 - 使用 Confluence 宏
-        elif line.strip() == '---':
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            result_lines.append('<hr />')
-        # 處理空行
-        elif line.strip() == '':
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            # 空行不輸出任何內容，讓段落自然分隔
-            continue
-        # 一般文字（可能包含格式）
-        else:
-            if in_list:
-                result_lines.append('</ul>')
-                in_list = False
-            # 處理行內格式
-            formatted_line = process_inline_formatting(line)
-            result_lines.append(f'<p>{formatted_line}</p>')
-
-    # 關閉未結束的列表
-    if in_list:
-        result_lines.append('</ul>')
-
-    return '\n'.join(result_lines)
-
-
-def escape_html(text):
-    """轉義 HTML 特殊字元"""
-    return (text.replace('&', '&amp;')
-                .replace('<', '&lt;')
-                .replace('>', '&gt;')
-                .replace('"', '&quot;')
-                .replace("'", '&#x27;'))
-
-
-def process_inline_formatting(text):
-    """處理行內格式（粗體、斜體、連結等）"""
-    # 處理粗體 **text**
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-    # 處理斜體 *text* (但不要匹配已經處理過的)
-    text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<em>\1</em>', text)
-    # 處理程式碼 `code`
-    text = re.sub(r'`(.+?)`', r'<code>\1</code>', text)
-    # 處理連結 [text](url)
-    text = re.sub(r'\[(.+?)\]\((.+?)\)', r'<a href="\2">\1</a>', text)
-
-    return text
-
-
-def create_confluence_child_page(parent_page_id, title, content):
-    """
-    在指定的父頁面下建立新的子頁面
-    """
-    try:
-        auth = (confluence_email, confluence_api_token)
-        url = f"{confluence_url}/wiki/rest/api/content"
-
-        today = datetime.now().strftime("%Y-%m-%d")
-
-        # 組合完整的頁面內容 (Markdown)
-        markdown_content = f"""## 更新時間：{today}
-
-{content}
-
----
-
-*本頁面由自動化程式建立*
-*資料來源：Google Gemini 3 Flash API (with Google Search)*
-"""
-        # 確保內容是有效的 UTF-8 編碼
-        markdown_content = markdown_content.encode('utf-8', errors='ignore').decode('utf-8')
-
-        # 轉換為 Confluence storage 格式
-        storage_content = markdown_to_confluence_storage(markdown_content)
-
-        # 準備建立新頁面的資料
-        data = {
-            "type": "page",
-            "title": title,
-            "space": {
-                "key": "TrendLifeRD"  # 從 URL 可以看出 space key
-            },
-            "ancestors": [
-                {
-                    "id": parent_page_id  # 指定父頁面
-                }
-            ],
-            "body": {
-                "storage": {
-                    "value": storage_content,
-                    "representation": "storage"  # 使用 storage 格式
-                }
-            }
-        }
-
-        headers = {
-            "Content-Type": "application/json"
-        }
-
-        response = requests.post(url, json=data, auth=auth, headers=headers)
-        response.raise_for_status()
-
-        # 取得新建立頁面的資訊
-        new_page = response.json()
-        new_page_id = new_page.get('id')
-
-        return True, f"成功建立新頁面！頁面 ID：{new_page_id}", new_page_id
-
-    except requests.exceptions.HTTPError as e:
-        return False, f"HTTP 錯誤：{e.response.status_code} - {e.response.text}", None
-    except Exception as e:
-        return False, f"建立頁面時發生錯誤：{e}", None
+        return f"處理新聞時發生未知錯誤: {e}"
 
 
 def main():
     """
-    主程式：獲取 AI 新聞並在 Confluence 建立新的子頁面
+    主程式：檢查設定並發送 LINE 訊息
     """
-    # 檢查必要的環境變數
-    if not all([confluence_email, confluence_api_token]):
-        print("錯誤：請設定 CONFLUENCE_USERNAME 和 CONFLUENCE_API_TOKEN 環境變數。")
-        print("\n請在 .env 檔案中設定：")
-        print("CONFLUENCE_USERNAME=your-email@trendmicro.com")
-        print("CONFLUENCE_API_TOKEN=your-api-token")
-        print("\nAPI Token 可以在這裡生成：https://id.atlassian.com/manage-profile/security/api-tokens")
+    if not channel_access_token:
+        print("錯誤：請設定 CHANNEL_ACCESS_TOKEN 環境變數。")
+        return
+    
+    if not user_ids:
+        print("錯誤：請在 config.toml 或環境變數中設定 USER_ID。")
         return
 
-    print("正在獲取最新 AI 新聞...")
-    news_content, error = get_ai_news()
+    configuration = Configuration(access_token=channel_access_token)
+    message_text = get_ai_news()
 
-    if error:
-        print(f"錯誤：{error}")
-        return
+    print(f"準備發送訊息至 {len(user_ids)} 位使用者...")
+    print(f"內容摘要:\n---\n{message_text[:100]}...\n---")
 
-    print(f"\n成功獲取新聞內容：\n{'-'*60}\n{news_content}\n{'-'*60}\n")
+    try:
+        with ApiClient(configuration) as api_client:
+            api_instance = MessagingApi(api_client)
+            for uid in user_ids:
+                push_message_request = PushMessageRequest(
+                    to=uid,
+                    messages=[TextMessage(text=message_text)]
+                )
+                api_instance.push_message(push_message_request)
+                print(f"✓ 訊息成功發送至 {uid}")
 
-    # 使用日期作為頁面標題
-    today = datetime.now().strftime("%Y-%m-%d")
-    page_title = f"AI 新聞摘要 - {today}"
-
-    print(f"正在建立新的 Confluence 子頁面（父頁面 ID: {confluence_parent_page_id}）...")
-    success, message, new_page_id = create_confluence_child_page(
-        confluence_parent_page_id,
-        page_title,
-        news_content
-    )
-
-    if success:
-        print(f"✓ {message}")
-        print(f"✓ 頁面連結：{confluence_url}/wiki/spaces/TrendLifeRD/pages/{new_page_id}")
-    else:
-        print(f"✗ {message}")
-
+    except ApiException as e:
+        print(f"發送訊息時發生錯誤 (LINE API): {e.status}")
+        print(f"原因: {e.reason}")
+        print(f"內容: {e.body}")
+    except Exception as e:
+        print(f"發生未預期的錯誤: {e}")
 
 if __name__ == "__main__":
     main()

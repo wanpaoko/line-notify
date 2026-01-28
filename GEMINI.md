@@ -6,18 +6,17 @@ This project contains a collection of Python scripts managed with `uv` for autom
 
 ### 1. `my-news.py` (LINE Bot News)
 -   **Purpose:** Fetches daily AI/LLM news using **Gemini 2.5 Pro** (with Google Search grounding) and sends a summary to a specific user via the **LINE Messaging API**.
--   **Key Dependencies:** `line-bot-sdk`, `google-genai`, `python-dotenv`.
--   **Env Vars Required:** `CHANNEL_ACCESS_TOKEN`, `USER_ID`, `GEMINI_API_KEY`.
+-   **Key Dependencies:** `line-bot-sdk`, `google-genai`, `python-dotenv`, `tomli`.
+-   **Env Vars Required:** `CHANNEL_ACCESS_TOKEN`, `GEMINI_API_KEY`.
+-   **Config File:** Can use `config/config.toml` to specify `[news] USER_ID`.
 
 ### 2. `ai-news.py` (Confluence News)
--   **Purpose:** Fetches AI news using **Gemini 3 Flash** (preview) and automatically creates a new child page in **Confluence** with the summary.
--   **Key Dependencies:** `requests`, `google-genai`.
--   **Env Vars Required:** `GEMINI_API_KEY`, `CONFLUENCE_URL`, `CONFLUENCE_USERNAME`, `CONFLUENCE_API_TOKEN`, `CONFLUENCE_PARENT_PAGE_ID`.
-
+...
 ### 3. `check-ispo-shopback.py` (ShopBack Monitor)
--   **Purpose:** Scrapes the ShopBack ISPO page to check for cashback rates. If the rate exceeds a configured threshold (default 9%), it sends a notification via **LINE Notify**.
--   **Key Dependencies:** `requests`, `beautifulsoup4`.
--   **Env Vars Required:** `LINE_NOTIFY_TOKEN`, `CASHBACK_THRESHOLD` (optional).
+-   **Purpose:** Scrapes the ShopBack ISPO page to check for cashback rates. If the rate exceeds a configured threshold (default 9%), it sends a notification via **LINE Notify** and/or **LINE Messaging API**.
+-   **Key Dependencies:** `requests`, `beautifulsoup4`, `line-bot-sdk`, `tomli`.
+-   **Env Vars Required:** `LINE_NOTIFY_TOKEN` (optional), `CHANNEL_ACCESS_TOKEN` (optional), `CASHBACK_THRESHOLD` (optional).
+-   **Config File:** Can use `config/config.toml` to specify `[ispo] USER_ID` (list of users).
 
 ### 4. `SHOPBACK_SETUP.md`
 -   **Purpose:** Documentation for setting up the ShopBack monitoring script.

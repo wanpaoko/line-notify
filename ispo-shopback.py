@@ -1,15 +1,35 @@
 import os
 import re
 import requests
+import tomli
 from bs4 import BeautifulSoup
 from datetime import datetime
 from dotenv import load_dotenv
+from linebot.v3.messaging import (
+    Configuration, ApiClient, MessagingApi,
+    PushMessageRequest, TextMessage
+)
+from linebot.v3.messaging.exceptions import ApiException
 
 # --- 讀取 .env ---
 load_dotenv()
 
-# --- 從環境變數讀取設定 ---
+# --- 讀取 TOML 設定 ---
+config_data = {}
+config_path = "config/config.toml"
+if os.path.exists(config_path):
+    with open(config_path, "rb") as f:
+        config_data = tomli.load(f)
+
+# --- 從環境變數或 TOML 讀取設定 ---
 line_notify_token = os.environ.get("LINE_NOTIFY_TOKEN")
+channel_access_token = os.environ.get("CHANNEL_ACCESS_TOKEN")
+# 從 config.toml 讀取 ispo user ids (清單)
+ispo_user_ids = config_data.get("ispo", {}).get("USER_ID", [])
+# 如果不是 list，轉成 list
+if isinstance(ispo_user_ids, str):
+    ispo_user_ids = [ispo_user_ids]
+
 threshold_percentage = float(os.environ.get("CASHBACK_THRESHOLD", "9.0"))
 shopback_url = "https://www.shopback.com.tw/ispo"
 
@@ -99,6 +119,29 @@ def send_line_notify(message):
         return False, f"發送 LINE 通知失敗：{e}"
 
 
+def send_line_message(user_id, message):
+    """
+    發送訊息到指定的 LINE User ID (使用 Messaging API)
+    """
+    if not channel_access_token:
+        return False, "錯誤：尚未設定 CHANNEL_ACCESS_TOKEN 環境變數"
+
+    configuration = Configuration(access_token=channel_access_token)
+    try:
+        with ApiClient(configuration) as api_client:
+            api_instance = MessagingApi(api_client)
+            push_message_request = PushMessageRequest(
+                to=user_id,
+                messages=[TextMessage(text=message)]
+            )
+            api_instance.push_message(push_message_request)
+        return True, f"訊息成功發送至 {user_id}"
+    except ApiException as e:
+        return False, f"發送訊息至 {user_id} 失敗 (LINE API): {e.reason}"
+    except Exception as e:
+        return False, f"發生未預期的錯誤: {e}"
+
+
 def main():
     """
     主程式：檢查 ShopBack ISPO 回饋並在超過門檻時發送 LINE 通知
@@ -132,13 +175,28 @@ def main():
 立即前往：{shopback_url}
 """
 
-        print("\n正在發送 LINE 通知...")
-        success, result_msg = send_line_notify(message)
+        # 1. 發送 LINE Notify
+        if line_notify_token:
+            print("\n正在發送 LINE Notify 通知...")
+            success, result_msg = send_line_notify(message)
+            if success:
+                print(f"✓ {result_msg}")
+            else:
+                print(f"✗ {result_msg}")
 
-        if success:
-            print(f"✓ {result_msg}")
-        else:
-            print(f"✗ {result_msg}")
+        # 2. 發送 LINE Messaging API (to multiple users)
+        if ispo_user_ids:
+            if not channel_access_token:
+                print("\n✗ 錯誤：設定了 USER_ID 但未提供 CHANNEL_ACCESS_TOKEN，無法發送 Messaging API 訊息。")
+            else:
+                print(f"\n正在發送 Messaging API 訊息至 {len(ispo_user_ids)} 位使用者...")
+                for uid in ispo_user_ids:
+                    success, result_msg = send_line_message(uid, message)
+                    if success:
+                        print(f"✓ {result_msg}")
+                    else:
+                        print(f"✗ {result_msg}")
+
     else:
         print(f"✓ 回饋率 {cashback}% 未超過門檻 {threshold_percentage}%，不發送通知")
 
