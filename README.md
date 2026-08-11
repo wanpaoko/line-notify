@@ -67,6 +67,18 @@ CASHBACK_THRESHOLD=10.0
 cp config/config.toml.example config/config.toml
 ```
 
+> **🔍 如何查詢 LINE USER_ID 或 GROUP_ID？**
+> 
+> 在使用 LINE Messaging API 時，傳送對象的 ID 並非我們平常用的「LINE ID」，而是以特定英文字母開頭的字串（如 `U` 開頭為使用者、`C` 開頭為群組、`R` 開頭為聊天室）。
+> 
+> *   **取得開發者本人的 USER_ID** (最快)：
+>     1. 登入 [LINE Developers Console](https://developers.line.biz/console/)。
+>     2. 進入你的 Provider 與 Messaging API Channel。
+>     3. 切換到 **Basic settings** 分頁，滑到最下方即可找到 **Your user ID**。
+> *   **取得群組 GROUP_ID 或其他人的 USER_ID**：
+>     必須透過 Webhook 接收使用者的訊息事件來取得。當有人在群組內發言（需邀請你的機器人加入群組）或私訊機器人時，你的 Webhook 會收到 JSON 資料，其中的 `event.source.userId` 或 `event.source.groupId` 即為目標 ID。
+>     *建議：網路上有許多現成的「LINE ID 查詢機器人」，可以先暫時加它們為好友或邀請至群組，即可快速印出群組的 ID。*
+
 `config/config.toml` 內容說明：
 ```toml
 [news]
