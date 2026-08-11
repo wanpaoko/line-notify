@@ -4,9 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains two Python automation scripts:
-1. **ai-news.py**: Uses Google's Gemini 3 Flash API with Google Search grounding to fetch the latest 5 AI/LLM technology news articles and automatically creates child pages in Confluence with the summarized content.
-2. **check-ispo-shopback.py**: Monitors ShopBack's ISPO cashback rate and sends LINE Notify alerts when the cashback exceeds a specified threshold (default: 9%).
+This repository contains three Python automation scripts for monitoring and notifications:
+
+1. **ai-news.py**: Fetches latest AI/LLM news using Google Gemini 2.5 Flash with Google Search grounding and sends formatted summaries via LINE Messaging API to configured users.
+
+2. **ispo-shopback.py**: Monitors ShopBack's ISPO cashback rate via web scraping and sends LINE notifications (via both LINE Notify and LINE Messaging API) when cashback exceeds a threshold.
+
+3. **check_tsmc_price.py**: Monitors TSMC stock price (2330.TW) from Yahoo Finance Taiwan and alerts when price drops below a threshold.
 
 ## Development Setup
 
@@ -18,106 +22,183 @@ source venv/bin/activate  # On macOS/Linux
 # venv\Scripts\activate   # On Windows
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -e .
+# Or manually install from pyproject.toml dependencies
 ```
 
-### Configuration
-The project requires a `.env` file (copy from `.env.example`):
+### Configuration Files
+
+The project uses two configuration methods:
+
+1. **Environment variables (.env file)**:
+   - Copy `.env.example` to `.env` and fill in values
+   - Required for API keys and tokens
+
+2. **TOML configuration (config/config.toml)**:
+   - Used for USER_ID lists (supports multiple recipients)
+   - Structure:
+     ```toml
+     [news]
+     USER_ID = ["user_id_1", "user_id_2"]
+
+     [ispo]
+     USER_ID = ["user_id_1", "user_id_2"]
+     ```
+
+### Required Environment Variables
 
 **For ai-news.py:**
 - `GEMINI_API_KEY`: Google Gemini API key from https://aistudio.google.com/app/apikey
-- `CONFLUENCE_URL`: Confluence instance URL (default: https://trendmicro.atlassian.net)
-- `CONFLUENCE_USERNAME`: Email address for Atlassian account
-- `CONFLUENCE_API_TOKEN`: API token from https://id.atlassian.com/manage-profile/security/api-tokens
-- `CONFLUENCE_PARENT_PAGE_ID`: Parent page ID where new pages will be created (extract from Confluence page URL)
+- `CHANNEL_ACCESS_TOKEN`: LINE Messaging API channel access token
+- Optional: `USER_ID` (can be set in config.toml under `[news]` section)
 
-**For check-ispo-shopback.py:**
+**For ispo-shopback.py:**
+- `CHANNEL_ACCESS_TOKEN`: LINE Messaging API channel access token
 - `LINE_NOTIFY_TOKEN`: LINE Notify token from https://notify-bot.line.me/
-- `CASHBACK_THRESHOLD`: Threshold percentage for alerts (default: 9.0)
+- `CASHBACK_THRESHOLD`: Threshold percentage for alerts (default: 10.0)
+- User IDs configured in config.toml under `[ispo]` section
+
+**For check_tsmc_price.py:**
+- No environment variables required
+- Threshold can be passed as command-line argument
 
 ### Running the Scripts
 ```bash
-# Run AI news to Confluence updater
+# Run AI news fetcher and send to LINE
 python ai-news.py
 
 # Run ShopBack ISPO cashback checker
-python check-ispo-shopback.py
+python ispo-shopback.py
+
+# Run TSMC stock price checker
+python check_tsmc_price.py           # Uses default threshold (1700)
+python check_tsmc_price.py 1650      # Custom threshold
 ```
 
 ## Architecture
 
 ### ai-news.py Components
 
-1. **News Fetching (`get_ai_news()`)** (ai-news.py:20-71)
-   - Uses Gemini 3 Flash Preview model (`gemini-3-flash-preview`) with Google Search grounding
-   - Generates Chinese language news summaries in Markdown format
-   - Configured with temperature=0.7 and max_output_tokens=2000
-   - Returns 5 recent AI/LLM news items with titles (### format) and bullet-point summaries
+1. **Configuration Loading** (ai-news.py:14-34)
+   - Loads environment variables from .env
+   - Reads config.toml for USER_ID lists
+   - Supports both string and list formats for USER_ID
+   - Falls back to environment variable if TOML config not present
 
-2. **Markdown to Confluence Conversion** (ai-news.py:74-167)
-   - `markdown_to_confluence_storage()`: Converts Markdown to Confluence Storage Format (XHTML)
-   - `process_inline_formatting()`: Handles inline formatting (bold, italic, links, code)
-   - `escape_html()`: Escapes HTML special characters
-   - Supports: headings (h1-h3), bulleted/numbered lists, horizontal rules, inline formatting
+2. **News Fetching (`get_ai_news()`)** (ai-news.py:36-93)
+   - Uses Gemini 2.5 Flash model (`gemini-2.5-flash`)
+   - Configures Google Search grounding tool for real-time search
+   - Uses `thinking_config` with budget=-1 for extended thinking
+   - Streams response chunks and concatenates them
+   - Removes Markdown list symbols (`*`, `-`, `+`) from line starts
+   - Returns formatted message: "每日 AI 新聞摘要 🤖 (YYYY-MM-DD)\n\n[news content]"
 
-3. **Confluence Integration (`create_confluence_child_page()`)** (ai-news.py:170-232)
-   - Creates child pages under specified parent page using Confluence REST API
-   - Uses Space key "TrendLifeRD"
-   - Page title format: "AI 新聞摘要 - YYYY-MM-DD"
-   - Uses HTTP Basic Auth (email + API token)
-   - Endpoint: `{CONFLUENCE_URL}/wiki/rest/api/content`
+3. **LINE Message Sending (`main()`)** (ai-news.py:96-133)
+   - Uses LINE Messaging API v3 SDK
+   - Validates CHANNEL_ACCESS_TOKEN and USER_ID presence
+   - Sends push messages to multiple users in loop
+   - Handles ApiException with detailed error reporting
 
-### check-ispo-shopback.py Components
+### ispo-shopback.py Components
 
-1. **Cashback Rate Extraction (`get_shopback_cashback()`)** (check-ispo-shopback.py:15-65)
+1. **Configuration Loading** (ispo-shopback.py:14-34)
+   - Loads both LINE Notify token and Messaging API token
+   - Reads ISPO user IDs from config.toml `[ispo]` section
+   - Converts string USER_ID to list if needed
+   - Sets cashback threshold from environment (default: 10.0)
+
+2. **Cashback Rate Extraction (`get_shopback_cashback()`)** (ispo-shopback.py:37-93)
    - Fetches HTML from https://www.shopback.com.tw/ispo
    - Uses BeautifulSoup for HTML parsing
-   - Employs multiple regex patterns to extract cashback percentage
-   - Patterns include: "X% 現金回饋", "全館商品 X%", "高達 X%"
-   - Returns cashback percentage as float or error message
+   - Employs multiple regex patterns to extract cashback percentage:
+     - `(\d+(?:\.\d+)?)\s*%\s*現金回饋`
+     - `全館商品\s*(\d+(?:\.\d+)?)\s*%`
+     - `(\d+(?:\.\d+)?)\s*%\s*回饋`
+     - `高達\s*(\d+(?:\.\d+)?)\s*%`
+   - Falls back to searching span/div/p elements for percentage
+   - Returns tuple: (cashback_percentage, error_message)
 
-2. **LINE Notification (`send_line_notify()`)** (check-ispo-shopback.py:68-89)
-   - Sends alerts via LINE Notify API (https://notify-api.line.me/api/notify)
-   - Uses Bearer token authentication
-   - Formats message with cashback rate, threshold, timestamp, and URL
+3. **Dual Notification System**
+   - **LINE Notify (`send_line_notify()`)** (ispo-shopback.py:96-119): Simple notification API using Bearer token
+   - **LINE Messaging API (`send_line_message()`)** (ispo-shopback.py:122-142): Sends to specific user IDs with better formatting
 
-3. **Main Logic (`main()`)** (check-ispo-shopback.py:92-128)
+4. **Main Logic (`main()`)** (ispo-shopback.py:145-205)
    - Fetches current cashback rate
-   - Compares against configured threshold (default: 9%)
-   - Sends LINE notification only if threshold is exceeded
+   - Compares against threshold
+   - If exceeded, sends notifications via BOTH:
+     - LINE Notify (if token configured)
+     - LINE Messaging API to all users in ispo USER_ID list
+   - Message format includes: emoji, cashback rate, threshold, timestamp, URL
+
+### check_tsmc_price.py Components
+
+1. **Price Fetching (`get_tsmc_price()`)** (check_tsmc_price.py:12-56)
+   - Scrapes Yahoo Finance Taiwan: https://tw.stock.yahoo.com/quote/2330.TW
+   - Uses regex to find "成交" (traded price) pattern
+   - Falls back to "最低" (lowest price) if "成交" not found
+   - Returns integer price or None on error
+
+2. **Check and Notify (`check_and_notify()`)** (check_tsmc_price.py:58-75)
+   - Compares current price against threshold
+   - Prints notification message if below threshold
+   - Currently prints to stdout (no LINE integration)
+
+3. **Command-line Interface** (check_tsmc_price.py:77-87)
+   - Accepts optional threshold as first argument
+   - Default threshold: 1700
+   - Usage: `python check_tsmc_price.py [threshold]`
 
 ### Key Technical Details
 
-**ai-news.py:**
+**Common Patterns:**
+- All scripts use `python-dotenv` for environment variable management
+- All scripts use TOML configuration via `tomli` library
+- Web scraping scripts use User-Agent headers to avoid blocking
+- Error handling with try/except and detailed error messages
 
-- **API Model**: Uses `gemini-3-flash-preview` with Google Search grounding tool
-- **Encoding**: All content is explicitly encoded/decoded as UTF-8 with error handling (`errors='ignore'`)
-- **Confluence Format**: Uses "storage" representation (XHTML) for Confluence Cloud
-- **Page Structure**: Includes update timestamp, news content, and auto-generated footer with attribution
+**ai-news.py specific:**
+- Uses streaming API (`generate_content_stream`) for Gemini responses
+- Thinking budget set to -1 (unlimited)
+- Removes Markdown list symbols with regex: `re.sub(r"^[ \t]*[*+-][ \t]+", "", text, flags=re.MULTILINE)`
 
-**check-ispo-shopback.py:**
-- **Web Scraping**: Uses User-Agent header to avoid blocking, 10-second timeout for requests
-- **Pattern Matching**: Multiple regex patterns to handle various cashback display formats
-- **Threshold-based Alerts**: Only sends notifications when cashback exceeds threshold (avoids spam)
-- **LINE Notify API**: Simple HTTP POST with Bearer authentication
+**ispo-shopback.py specific:**
+- Supports dual notification channels (Notify + Messaging API)
+- Only sends when threshold exceeded (avoids spam)
+- Multiple regex patterns for robustness against HTML changes
+
+**check_tsmc_price.py specific:**
+- Simple stdout notification (no LINE integration yet)
+- Command-line configurable threshold
+- Fallback price detection patterns
 
 ## Dependencies
 
-- `python-dotenv`: Environment variable management
-- `requests`: HTTP client for API calls (Confluence, LINE Notify, web scraping)
-- `google-genai`: Google Generative AI SDK for Gemini API access
-- `beautifulsoup4`: HTML parsing for web scraping (ShopBack)
+Key dependencies from pyproject.toml:
+- `python-dotenv>=1.2.1`: Environment variable management
+- `requests>=2.32.5`: HTTP client for API calls and web scraping
+- `google-genai>=1.60.0`: Google Generative AI SDK for Gemini API
+- `beautifulsoup4>=4.14.3`: HTML parsing for web scraping
+- `line-bot-sdk>=3.22.0`: LINE Messaging API v3 SDK
+- `tomli>=2.4.0`: TOML configuration file parsing
+
+Requires Python >=3.10
 
 ## Error Handling
 
-**ai-news.py** validates:
-- Presence of required environment variables (GEMINI_API_KEY, CONFLUENCE_USERNAME, CONFLUENCE_API_TOKEN)
-- API response validity
-- HTTP status codes for Confluence API calls
-- UTF-8 encoding for all text content
+**ai-news.py:**
+- Validates GEMINI_API_KEY presence
+- Validates CHANNEL_ACCESS_TOKEN and USER_ID configuration
+- Catches ApiException from LINE SDK with detailed logging
+- Generic Exception handler for unexpected errors
 
-**check-ispo-shopback.py** validates:
-- Presence of LINE_NOTIFY_TOKEN
-- Network request success (with timeout)
-- Cashback percentage extraction (multiple fallback patterns)
-- LINE Notify API response status
+**ispo-shopback.py:**
+- Validates LINE_NOTIFY_TOKEN and CHANNEL_ACCESS_TOKEN
+- Returns error tuples from scraping function
+- Handles RequestException for network errors
+- Separate error handling for Notify vs Messaging API
+
+**check_tsmc_price.py:**
+- Handles RequestException for network errors
+- Validates integer parsing with ValueError
+- Generic Exception handler with logging
+- Returns None on any error in price fetching

@@ -1,122 +1,179 @@
-# AI 新聞自動更新到 Confluence
+# LINE Notify & AI 新聞自動化推播腳本集
 
-這是一個 Python 腳本，它會自動使用 Google 最新的 Gemini 2.5 Flash 模型結合 Google 搜尋，取得最新的 5 則 AI/LLM 技術新聞，並將摘要整理後，自動在指定的 Confluence 頁面下建立新的子頁面。
+本專案是一套基於 Python 與 `uv` 套件管理的自動化腳本集合。結合 **Google Gemini API** (具備 Google Search 實時搜尋能力)、**LINE Messaging API** 與 **LINE Notify**，實現每日 AI/股市新聞摘要、特惠回饋監控、生日祝福發送及股價警示等自動化功能。
 
-## ✨ 功能
+---
 
--   **自動化新聞摘要**：自動抓取最新的 5 則 AI 技術新聞。
--   **先進的 AI 模型**：使用 Gemini 2.5 Flash 搭配 Google Search grounding 產生高品質、Markdown 格式的摘要。
--   **自動建立 Confluence 子頁面**：每次執行會在指定的父頁面下建立新的子頁面，標題包含日期（例如：AI 新聞摘要 - 2025-12-23）。
--   **簡易設定**：只需要幾個環境變數即可完成設定。
+## ✨ 功能腳本一覽
 
-## ⚙️ 設定步驟
+| 腳本名稱 | 功能說明 | 主要技術 / API | 推播管道 |
+| :--- | :--- | :--- | :--- |
+| 🤖 **`ai-news.py`** | 自動抓取最新 AI / LLM 技術新聞並生成簡短摘要 | Gemini 2.5 Flash + Google Search Grounding | LINE Messaging API (`[news]`) |
+| 📈 **`stock-news.py`** | 自動抓取今日台股頭條與大盤/個股趨勢預測 | Gemini 2.5 Flash + Google Search Grounding | LINE Messaging API (`[stock]`) |
+| 🛍️ **`ispo-shopback.py`** | 監控 ShopBack ISPO 現金回饋率，超過設定門檻即發送推播 | Web Scraping (BeautifulSoup4) | LINE Notify & LINE Messaging API (`[ispo]`) |
+| 🎂 **`birthday-notify.py`** | 比對當天生日好友，使用 AI 產生個性化祝福語並發送通知 | Gemini API + `birthday-config.json` | LINE Messaging API |
+| 🏃 **`garmin-run.py`** | 發送 Garmin Run 賽事報名開跑通知 | LINE SDK & Requests | LINE Notify & LINE Messaging API (`[garmin-run]`) |
+| 💻 **`check_tsmc_price.py`** | 監控台積電 (2330.TW) 股價，跌破設定門檻時輸出警示 | Yahoo 奇摩股市爬蟲 | Console 輸出 (可搭配主控端整合) |
 
-### 1. 取得必要的金鑰
+---
 
-在開始之前，請先準備好以下資訊：
+## ⚙️ 環境準備與套件安裝
 
-#### Gemini API Key
-前往 [Google AI Studio](https://aistudio.google.com/app/apikey) 取得你的 API 金鑰。
+本專案建議使用 [`uv`](https://github.com/astral-sh/uv) 進行快速高效的 Python 虛擬環境與依賴管理。
 
-#### Confluence API Token
-1. 前往 [Atlassian API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-2. 點擊「Create API token」
-3. 為 token 命名（例如：AI-News-Updater）
-4. 複製生成的 token（只會顯示一次）
-
-#### Confluence 父頁面 ID
-從 Confluence 頁面 URL 中取得父頁面 ID（新頁面會建立在此頁面之下）。例如：
-```
-https://trendmicro.atlassian.net/wiki/spaces/TrendLifeRD/pages/1969488035/AI
-                                                                    ^^^^^^^^^^ 這是父頁面 ID
-```
-
-### 2. 安裝專案
+### 1. 安裝套件
 
 ```bash
-# 1. 複製這個專案
+# 複製專案
 git clone <your-repository-url>
-cd ai-news-update
+cd line-notify
 
-# 2. 建立並啟用虛擬環境
-python3 -m venv venv
-source venv/bin/activate
-
-# 3. 安裝必要的套件
-pip install -r requirements.txt
+# 使用 uv 自動同步並建立虛擬環境
+uv sync
 ```
 
-### 3. 設定環境變數
+*(若使用傳統 `pip`，可執行 `python3 -m venv .venv && source .venv/bin/activate && pip install .`)*
 
-將 `.env.example` 檔案複製為 `.env`，並填入你的設定：
+---
 
+## 🛠️ 設定檔說明與範例
+
+專案提供完整的範例設定檔，使用前請先複製並填入對應的 API Key 與 USER ID。
+
+### 1. `.env` (環境變數設定)
+複製 `.env.example` 為 `.env`：
 ```bash
 cp .env.example .env
 ```
 
-編輯 `.env` 檔案：
+`.env` 內容說明：
+```env
+# Google Gemini API 金鑰 (用於 ai-news.py, stock-news.py, birthday-notify.py)
+GEMINI_API_KEY=your-gemini-api-key-here
 
+# LINE Messaging API Channel Access Token (用於多數腳本發送 LINE Push Message)
+CHANNEL_ACCESS_TOKEN=your-channel-access-token-here
+USER_ID=your-default-line-user-id-here
+
+# LINE Notify Token (用於 ispo-shopback.py, garmin-run.py)
+LINE_NOTIFY_TOKEN=your-line-notify-token-here
+
+# ShopBack ISPO 回饋百分比門檻（預設 10.0%）
+CASHBACK_THRESHOLD=10.0
 ```
-GEMINI_API_KEY=你的 Gemini API Key
-CONFLUENCE_URL=https://trendmicro.atlassian.net
-CONFLUENCE_USERNAME=你的 Email（Atlassian 帳號）
-CONFLUENCE_API_TOKEN=你的 Confluence API Token
-CONFLUENCE_PARENT_PAGE_ID=1969488035
+
+### 2. `config/config.toml` (群組/使用者 LINE ID 設定)
+複製 `config/config.toml.example` 為 `config/config.toml`：
+```bash
+cp config/config.toml.example config/config.toml
 ```
 
-## 🚀 如何執行
+`config/config.toml` 內容說明：
+```toml
+[news]
+# 用於 ai-news.py：接收每日 AI 新聞摘要的 LINE User ID 清單
+USER_ID = ["C1234567890abcdef1234567890abcdef"]
 
-完成設定後，直接執行主程式即可：
+[stock]
+# 用於 stock-news.py：接收每日台股頭條的 LINE User ID 清單
+USER_ID = ["U1234567890abcdef1234567890abcdef"]
+
+[ispo]
+# 用於 ispo-shopback.py：接收 ShopBack 高回饋通知的 LINE User ID 清單
+USER_ID = ["U1234567890abcdef1234567890abcdef", "C1234567890abcdef1234567890abcdef"]
+
+[garmin-run]
+# 用於 garmin-run.py：接收 Garmin Run 報名通知的 LINE User ID 清單
+USER_ID = ["C1234567890abcdef1234567890abcdef"]
+
+[trend]
+# 專屬群組或備用 ID 設定
+USER_ID = ["C9876543210abcdef9876543210abcdef"]
+```
+
+### 3. `config/birthday-config.json` (生日通知設定)
+複製 `config/birthday-config.json.example` 為 `config/birthday-config.json`：
+```bash
+cp config/birthday-config.json.example config/birthday-config.json
+```
+
+`config/birthday-config.json` 內容說明：
+```json
+{
+  "lineIds": {
+    "長榮馬": "C1234567890abcdef1234567890abcdef",
+    "忍太郎": "U1234567890abcdef1234567890abcdef",
+    "小資": "C9876543210abcdef9876543210abcdef"
+  },
+  "birthdayFriends": [
+    { "month": 2, "day": 26, "name": "Darren", "id": "小資" },
+    { "month": 8, "day": 8,  "name": "忍太郎", "id": "個人ID" }
+  ]
+}
+```
+
+---
+
+## 🚀 執行方式
+
+使用 `uv run` 可以直接在專案環境下執行指定的腳本：
 
 ```bash
-python ai-news.py
+# 1. 執行 AI 新聞摘要推播
+uv run ai-news.py
+
+# 2. 執行台股頭條與預測推播
+uv run stock-news.py
+
+# 3. 檢查 ShopBack ISPO 現金回饋率
+uv run ispo-shopback.py
+
+# 4. 執行每日生日祝福檢查與推播
+uv run birthday-notify.py
+
+# 5. 發送 Garmin Run 報名通知
+uv run garmin-run.py
+
+# 6. 檢查台積電股價 (預設門檻 1700，可自訂門檻參數)
+uv run check_tsmc_price.py
+uv run check_tsmc_price.py 1650
 ```
 
-程式會：
-1. 使用 Gemini 2.5 Flash 搭配 Google Search 搜尋最新的 5 則 AI 新聞
-2. 將新聞整理成 Markdown 格式
-3. 在指定的父頁面下自動建立新的子頁面（標題包含當天日期）
+---
 
-執行結果範例：
-```
-正在獲取最新 AI 新聞...
+## 🕒 設定 Crontab 排程自動化
 
-成功獲取新聞內容：
-------------------------------------------------------------
-### 1. OpenAI 發布 GPT-5
-...
-------------------------------------------------------------
-
-正在建立新的 Confluence 子頁面（父頁面 ID: 1969488035）...
-✓ 成功建立新頁面！頁面 ID：1970123456
-✓ 頁面連結：https://trendmicro.atlassian.net/wiki/spaces/TrendLifeRD/pages/1970123456
-```
-
-## 🕒 設定定時任務 (選用)
-
-若希望每日自動執行，可以將此腳本設定為 `cron` 定時任務。例如，設定每天早上 9 點執行：
+若需每日定期自動執行推播，可在伺服器上設定 `crontab`：
 
 ```bash
-# 輸入 crontab -e，並加入以下這行
-0 9 * * * /path/to/your/project/venv/bin/python /path/to/your/project/ai-news.py
+# 輸入 crontab -e 加入以下排程範例
+
+# 每日 08:30 發送 AI 新聞
+30 8 * * * cd /path/to/line-notify && /usr/local/bin/uv run ai-news.py >> logs/ai-news.log 2>&1
+
+# 每日 08:45 發送股市新聞
+45 8 * * * cd /path/to/line-notify && /usr/local/bin/uv run stock-news.py >> logs/stock-news.log 2>&1
+
+# 每日 09:00 檢查生日並發送祝福
+0 9 * * * cd /path/to/line-notify && /usr/local/bin/uv run birthday-notify.py >> logs/birthday-notify.log 2>&1
+
+# 每小時檢查 ShopBack 回饋
+0 * * * * cd /path/to/line-notify && /usr/local/bin/uv run ispo-shopback.py >> logs/ispo.log 2>&1
 ```
 
-或者使用 GitHub Actions 定時執行（需要額外設定）。
+---
 
 ## 🔧 故障排除
 
-### API Token 錯誤
-確認你的 Confluence API Token 是否正確，且 Email 必須是你的 Atlassian 帳號。
+1. **LINE Messaging API (401 / 403 錯誤)**：
+   - 請檢查 `.env` 中的 `CHANNEL_ACCESS_TOKEN` 是否正確且未過期。
+   - 確認 `config/config.toml` 或 `.env` 中的 `USER_ID` (User ID / Group ID / Room ID) 格式是否正確。
+2. **Gemini API 錯誤**：
+   - 請確認 `GEMINI_API_KEY` 已設定且配額充裕。
+3. **ShopBack 抓取失敗**：
+   - 可能是目標網頁 HTML 結構有變更，請檢視 `ispo-shopback.py` 中的 Regex 匹配邏輯。
 
-### 頁面建立失敗
-確認：
-1. 父頁面 ID 是否正確
-2. 你的帳號是否有在該父頁面下建立子頁面的權限
-3. Confluence URL 是否正確（不需要包含 /wiki 後綴）
-4. Space key 是否正確（預設為 TrendLifeRD）
-
-### 找不到新聞
-可能是 Google Search 暫時無法取得結果，稍後再試。
+---
 
 ## 📝 授權
 

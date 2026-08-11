@@ -1,0 +1,10 @@
+{
+  "lineIds": {
+    "群組A": "C1234567890abcdef1234567890abcdef",
+    "個人": "U1234567890abcdef1234567890abcdef"
+  },
+  "birthdayFriends": [
+    { "month": 1, "day": 15, "name": "小明", "id": "群組A" },
+    { "month": 8, "day": 8, "name": "老爸", "id": "個人" }
+  ]
+}

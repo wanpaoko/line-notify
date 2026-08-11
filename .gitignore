@@ -1,8 +1,10 @@
-.venv/
 venv/
 __pycache__/
 *.pyc
 .env
 .DS_Store
-cron.log
+*.log
 config/config.toml
+.antigravitycli/
+config/birthday-config.json
+debug_json.txt

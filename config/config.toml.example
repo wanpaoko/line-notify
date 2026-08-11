@@ -1,5 +1,21 @@
+# LINE 訊息接收者 USER_ID 設定檔
+
 [news]
-USER_ID = [""]
+# 用於 ai-news.py (每日 AI 新聞)
+USER_ID = ["Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+
+[stock]
+# 用於 stock-news.py (每日台股頭條)
+USER_ID = ["Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
 
 [ispo]
-USER_ID = [""]
+# 用於 ispo-shopback.py (ShopBack ISPO 回饋通知)
+USER_ID = ["Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+
+[garmin-run]
+# 用於 garmin-run.py (Garmin Run 報名通知)
+USER_ID = ["Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+
+[trend]
+# 專屬群組設定範例
+USER_ID = ["Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]

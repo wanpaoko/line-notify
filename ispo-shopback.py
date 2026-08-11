@@ -30,7 +30,7 @@ ispo_user_ids = config_data.get("ispo", {}).get("USER_ID", [])
 if isinstance(ispo_user_ids, str):
     ispo_user_ids = [ispo_user_ids]
 
-threshold_percentage = float(os.environ.get("CASHBACK_THRESHOLD", "9.0"))
+threshold_percentage = float(os.environ.get("CASHBACK_THRESHOLD", "10.0"))
 shopback_url = "https://www.shopback.com.tw/ispo"
 
 

@@ -1,5 +1,0 @@
-[news]
-#USER_ID = ["C1234567890abcdef1234567890abcdef"]
-USER_ID = ["U0987654321abcdef0987654321abcdef"]
-[ispo]
-USER_ID = ["U1234567890abcdef1234567890abcdef", "C1234567890abcdef1234567890abcdef"]

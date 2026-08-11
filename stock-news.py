@@ -26,7 +26,7 @@ channel_access_token = os.environ.get("CHANNEL_ACCESS_TOKEN")
 gemini_api_key = os.environ.get("GEMINI_API_KEY")
 
 # 優先從 config.toml 讀取 USER_ID (可能是 list 或 str)
-user_ids = config_data.get("news", {}).get("USER_ID") or os.environ.get("USER_ID")
+user_ids = config_data.get("stock", {}).get("USER_ID") or os.environ.get("USER_ID")
 # 確保轉為 list
 if isinstance(user_ids, str):
     user_ids = [user_ids]
@@ -48,11 +48,12 @@ def get_ai_news():
         client = genai.Client(api_key=gemini_api_key)
 
         prompt_text = (
-            f"今天是 {today}，請搜尋最近 5 則與 AI 或 LLM 相關的技術新聞。\n\n"
+            f"今天是 {today}，請今天的台灣股市的頭條新聞5則，以影響台股的排序為主，並總結今日股市的漲跌預測。\n\n"
             "請遵守以下格式規定：\n"
             "每則新聞格式範例：\n"
-            "*[新聞標題]*\n"
+            "*[新聞標題摘要，約20-3字]*\n"
             "[簡短摘要, 約20-30字]\n"
+            "*[今日股市漲跌預測，約30字]*\n"
         )
 
         contents = [
@@ -85,9 +86,9 @@ def get_ai_news():
         news_summary = news_summary.strip()
 
         if news_summary:
-            return f"每日 AI 新聞摘要 🤖 ({today})\n\n{news_summary}"
+            return f"每日股市頭條 🤖 ({today})\n\n{news_summary}"
         else:
-            return "目前找不到最新的 AI 新聞。"
+            return "目前找不到最新的股市新聞。"
 
     except Exception as e:
         return f"處理新聞時發生未知錯誤: {e}"
