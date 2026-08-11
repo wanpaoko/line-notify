@@ -8,8 +8,8 @@
 
 | 腳本名稱 | 功能說明 | 主要技術 / API | 推播管道 |
 | :--- | :--- | :--- | :--- |
-| 🤖 **`ai-news.py`** | 自動抓取最新 AI / LLM 技術新聞並生成簡短摘要 | Gemini 2.5 Flash + Google Search Grounding | LINE Messaging API (`[news]`) |
-| 📈 **`stock-news.py`** | 自動抓取今日台股頭條與大盤/個股趨勢預測 | Gemini 2.5 Flash + Google Search Grounding | LINE Messaging API (`[stock]`) |
+| 🤖 **`ai-news.py`** | 自動抓取最新 AI / LLM 技術新聞並生成簡短摘要 | Gemini 3.5 Flash-Lite + Google Search Grounding | LINE Messaging API (`[news]`) |
+| 📈 **`stock-news.py`** | 自動抓取今日台股頭條與大盤/個股趨勢預測 | Gemini 3.5 Flash-Lite + Google Search Grounding | LINE Messaging API (`[stock]`) |
 | 🛍️ **`ispo-shopback.py`** | 監控 ShopBack ISPO 現金回饋率，超過設定門檻即發送推播 | Web Scraping (BeautifulSoup4) | LINE Notify & LINE Messaging API (`[ispo]`) |
 | 🎂 **`birthday-notify.py`** | 比對當天生日好友，使用 AI 產生個性化祝福語並發送通知 | Gemini API + `birthday-config.json` | LINE Messaging API |
 | 🏃 **`garmin-run.py`** | 發送 Garmin Run 賽事報名開跑通知 | LINE SDK & Requests | LINE Notify & LINE Messaging API (`[garmin-run]`) |

@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository contains several Python automation scripts for monitoring and notifications:
 
-1. **ai-news.py**: Fetches latest AI/LLM news using Google Gemini 2.5 Flash with Google Search grounding and sends formatted summaries via LINE Messaging API to configured users.
+1. **ai-news.py**: Fetches latest AI/LLM news using Google Gemini 3.5 Flash-Lite with Google Search grounding and sends formatted summaries via LINE Messaging API to configured users.
 
-2. **stock-news.py**: Fetches daily Taiwan stock headlines and market forecasts using Gemini 2.5 Flash with Google Search grounding, pushing via LINE Messaging API.
+2. **stock-news.py**: Fetches daily Taiwan stock headlines and market forecasts using Gemini 3.5 Flash-Lite with Google Search grounding, pushing via LINE Messaging API.
 
 3. **ispo-shopback.py**: Monitors ShopBack's ISPO cashback rate via web scraping and sends LINE notifications (via both LINE Notify and LINE Messaging API) when cashback exceeds a threshold.
 
@@ -91,7 +91,7 @@ uv run garmin-run.py
    - Falls back to environment variable if TOML config not present
 
 2. **News Fetching (`get_ai_news()`)** (ai-news.py:36-93)
-   - Uses Gemini 2.5 Flash model (`gemini-2.5-flash`)
+   - Uses Gemini 3.5 Flash-Lite model (`gemini-3.5-flash-lite`)
    - Configures Google Search grounding tool for real-time search
    - Uses `thinking_config` with budget=-1 for extended thinking
    - Streams response chunks and concatenates them

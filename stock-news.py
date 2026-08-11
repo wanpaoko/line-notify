@@ -35,7 +35,7 @@ elif user_ids is None:
 
 def get_ai_news():
     """
-    從 Gemini 2.5 + Google Search 獲取最新 AI 新聞摘要
+    從 Gemini 3.5 Flash-Lite + Google Search 獲取最新 AI 新聞摘要
     """
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -74,7 +74,7 @@ def get_ai_news():
         # 使用 generate_content_stream 取得新聞摘要
         news_summary = ""
         for chunk in client.models.generate_content_stream(
-            model="gemini-flash-latest",
+            model="gemini-3.5-flash-lite",
             contents=contents,
             config=config
         ):

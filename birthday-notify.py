@@ -39,7 +39,7 @@ def generate_birthday_message(friend_name):
     prompt = f"請為 {friend_name} 生成一句簡短的生日快樂祝福語，約 15-20 字，並包含 {friend_name}"
 
     response = client.models.generate_content(
-        model="gemini-flash-latest",
+        model="gemini-3.5-flash-lite",
         contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
         config=types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(thinking_budget=0)

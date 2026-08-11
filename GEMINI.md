@@ -5,13 +5,13 @@ This project contains a collection of Python scripts managed with `uv` for autom
 ## 📂 Key Files & Scripts
 
 ### 1. `ai-news.py` (AI News via LINE Bot)
-- **Purpose:** Fetches daily AI/LLM news using **Gemini 2.5 Flash** (with Google Search grounding) and sends a summary via **LINE Messaging API**.
+- **Purpose:** Fetches daily AI/LLM news using **Gemini 3.5 Flash-Lite** (with Google Search grounding) and sends a summary via **LINE Messaging API**.
 - **Key Dependencies:** `line-bot-sdk`, `google-genai`, `python-dotenv`, `tomli`.
 - **Env Vars Required:** `CHANNEL_ACCESS_TOKEN`, `GEMINI_API_KEY`.
 - **Config File:** `config/config.toml` under `[news] USER_ID`.
 
 ### 2. `stock-news.py` (Taiwan Stock News via LINE Bot)
-- **Purpose:** Fetches daily Taiwan stock headlines & market forecast using **Gemini 2.5 Flash** (with Google Search grounding) and sends a summary via **LINE Messaging API**.
+- **Purpose:** Fetches daily Taiwan stock headlines & market forecast using **Gemini 3.5 Flash-Lite** (with Google Search grounding) and sends a summary via **LINE Messaging API**.
 - **Key Dependencies:** `line-bot-sdk`, `google-genai`, `python-dotenv`, `tomli`.
 - **Env Vars Required:** `CHANNEL_ACCESS_TOKEN`, `GEMINI_API_KEY`.
 - **Config File:** `config/config.toml` under `[stock] USER_ID`.
