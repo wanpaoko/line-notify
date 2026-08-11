@@ -4,26 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository contains three Python automation scripts for monitoring and notifications:
+This repository contains several Python automation scripts for monitoring and notifications:
 
 1. **ai-news.py**: Fetches latest AI/LLM news using Google Gemini 2.5 Flash with Google Search grounding and sends formatted summaries via LINE Messaging API to configured users.
 
-2. **ispo-shopback.py**: Monitors ShopBack's ISPO cashback rate via web scraping and sends LINE notifications (via both LINE Notify and LINE Messaging API) when cashback exceeds a threshold.
+2. **stock-news.py**: Fetches daily Taiwan stock headlines and market forecasts using Gemini 2.5 Flash with Google Search grounding, pushing via LINE Messaging API.
 
-3. **check_tsmc_price.py**: Monitors TSMC stock price (2330.TW) from Yahoo Finance Taiwan and alerts when price drops below a threshold.
+3. **ispo-shopback.py**: Monitors ShopBack's ISPO cashback rate via web scraping and sends LINE notifications (via both LINE Notify and LINE Messaging API) when cashback exceeds a threshold.
+
+4. **birthday-notify.py**: Checks a configured list of birthdays for today's date, generates AI birthday wishes using Gemini, and sends push notifications via LINE Messaging API.
+
+5. **garmin-run.py**: Sends Garmin Run registration notifications via LINE Notify and/or LINE Messaging API.
 
 ## Development Setup
 
 ### Environment Setup
+We recommend using [`uv`](https://github.com/astral-sh/uv) for package management:
 ```bash
-# Create and activate virtual environment
+# Using uv (Recommended)
+uv sync
+
+# Or manually using pip
 python3 -m venv venv
 source venv/bin/activate  # On macOS/Linux
-# venv\Scripts\activate   # On Windows
-
-# Install dependencies
-pip install -e .
-# Or manually install from pyproject.toml dependencies
+pip install .
 ```
 
 ### Configuration Files
@@ -58,21 +62,22 @@ The project uses two configuration methods:
 - `CASHBACK_THRESHOLD`: Threshold percentage for alerts (default: 10.0)
 - User IDs configured in config.toml under `[ispo]` section
 
-**For check_tsmc_price.py:**
-- No environment variables required
-- Threshold can be passed as command-line argument
-
 ### Running the Scripts
 ```bash
 # Run AI news fetcher and send to LINE
-python ai-news.py
+uv run ai-news.py
+
+# Run Taiwan stock news fetcher
+uv run stock-news.py
 
 # Run ShopBack ISPO cashback checker
-python ispo-shopback.py
+uv run ispo-shopback.py
 
-# Run TSMC stock price checker
-python check_tsmc_price.py           # Uses default threshold (1700)
-python check_tsmc_price.py 1650      # Custom threshold
+# Run birthday notifications
+uv run birthday-notify.py
+
+# Run Garmin Run notification
+uv run garmin-run.py
 ```
 
 ## Architecture
@@ -130,24 +135,6 @@ python check_tsmc_price.py 1650      # Custom threshold
      - LINE Messaging API to all users in ispo USER_ID list
    - Message format includes: emoji, cashback rate, threshold, timestamp, URL
 
-### check_tsmc_price.py Components
-
-1. **Price Fetching (`get_tsmc_price()`)** (check_tsmc_price.py:12-56)
-   - Scrapes Yahoo Finance Taiwan: https://tw.stock.yahoo.com/quote/2330.TW
-   - Uses regex to find "成交" (traded price) pattern
-   - Falls back to "最低" (lowest price) if "成交" not found
-   - Returns integer price or None on error
-
-2. **Check and Notify (`check_and_notify()`)** (check_tsmc_price.py:58-75)
-   - Compares current price against threshold
-   - Prints notification message if below threshold
-   - Currently prints to stdout (no LINE integration)
-
-3. **Command-line Interface** (check_tsmc_price.py:77-87)
-   - Accepts optional threshold as first argument
-   - Default threshold: 1700
-   - Usage: `python check_tsmc_price.py [threshold]`
-
 ### Key Technical Details
 
 **Common Patterns:**
@@ -165,11 +152,6 @@ python check_tsmc_price.py 1650      # Custom threshold
 - Supports dual notification channels (Notify + Messaging API)
 - Only sends when threshold exceeded (avoids spam)
 - Multiple regex patterns for robustness against HTML changes
-
-**check_tsmc_price.py specific:**
-- Simple stdout notification (no LINE integration yet)
-- Command-line configurable threshold
-- Fallback price detection patterns
 
 ## Dependencies
 
@@ -196,9 +178,3 @@ Requires Python >=3.10
 - Returns error tuples from scraping function
 - Handles RequestException for network errors
 - Separate error handling for Notify vs Messaging API
-
-**check_tsmc_price.py:**
-- Handles RequestException for network errors
-- Validates integer parsing with ValueError
-- Generic Exception handler with logging
-- Returns None on any error in price fetching

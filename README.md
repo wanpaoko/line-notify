@@ -13,7 +13,6 @@
 | 🛍️ **`ispo-shopback.py`** | 監控 ShopBack ISPO 現金回饋率，超過設定門檻即發送推播 | Web Scraping (BeautifulSoup4) | LINE Notify & LINE Messaging API (`[ispo]`) |
 | 🎂 **`birthday-notify.py`** | 比對當天生日好友，使用 AI 產生個性化祝福語並發送通知 | Gemini API + `birthday-config.json` | LINE Messaging API |
 | 🏃 **`garmin-run.py`** | 發送 Garmin Run 賽事報名開跑通知 | LINE SDK & Requests | LINE Notify & LINE Messaging API (`[garmin-run]`) |
-| 💻 **`check_tsmc_price.py`** | 監控台積電 (2330.TW) 股價，跌破設定門檻時輸出警示 | Yahoo 奇摩股市爬蟲 | Console 輸出 (可搭配主控端整合) |
 
 ---
 
@@ -133,10 +132,6 @@ uv run birthday-notify.py
 
 # 5. 發送 Garmin Run 報名通知
 uv run garmin-run.py
-
-# 6. 檢查台積電股價 (預設門檻 1700，可自訂門檻參數)
-uv run check_tsmc_price.py
-uv run check_tsmc_price.py 1650
 ```
 
 ---

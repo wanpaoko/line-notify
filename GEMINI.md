@@ -32,9 +32,6 @@ This project contains a collection of Python scripts managed with `uv` for autom
 - **Purpose:** Sends Garmin Run registration notifications via **LINE Notify** and/or **LINE Messaging API**.
 - **Config File:** `config/config.toml` under `[garmin-run] USER_ID`.
 
-### 6. `check_tsmc_price.py` (TSMC Stock Monitor)
-- **Purpose:** Scrapes Yahoo Finance Taiwan for TSMC stock price (2330.TW) and alerts when price falls below threshold.
-
 ## 🚀 Building and Running
 
 This project uses `uv` for package management.
@@ -61,7 +58,6 @@ uv run stock-news.py
 uv run ispo-shopback.py
 uv run birthday-notify.py
 uv run garmin-run.py
-uv run check_tsmc_price.py
 ```
 
 ## 🛠 Development Conventions
