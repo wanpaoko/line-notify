@@ -100,13 +100,13 @@ cp config/birthday-config.json.example config/birthday-config.json
 ```json
 {
   "lineIds": {
-    "長榮馬": "C1234567890abcdef1234567890abcdef",
-    "忍太郎": "U1234567890abcdef1234567890abcdef",
-    "小資": "C9876543210abcdef9876543210abcdef"
+    "群組A": "C1234567890abcdef1234567890abcdef",
+    "群組B": "C9876543210abcdef9876543210abcdef",
+    "個人": "U1234567890abcdef1234567890abcdef"
   },
   "birthdayFriends": [
-    { "month": 2, "day": 26, "name": "Darren", "id": "小資" },
-    { "month": 8, "day": 8,  "name": "忍太郎", "id": "個人ID" }
+    { "month": 2, "day": 26, "name": "Darren", "id": "群組B" },
+    { "month": 8, "day": 8,  "name": "老爸", "id": "個人" }
   ]
 }
 ```
