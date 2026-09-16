@@ -139,9 +139,9 @@ uv run stock-news.py
 # 3. 檢查 ShopBack ISPO 現金回饋率
 uv run ispo-shopback.py
 
-# 4. 執行每日生日祝福檢查與推播
+# 4. 執行每日生日祝福檢查與推播（可帶 --test 發送測試訊息至個人）
 uv run birthday-notify.py
-
+uv run birthday-notify.py --test
 # 5. 發送 Garmin Run 報名通知
 uv run garmin-run.py
 ```

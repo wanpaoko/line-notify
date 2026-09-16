@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 import tomli
 from google import genai
@@ -48,7 +48,7 @@ def get_ai_news():
         client = genai.Client(api_key=gemini_api_key)
 
         prompt_text = (
-            f"今天是 {today}，請搜尋最近 5 則與 AI 或 LLM 相關的技術新聞。\n\n"
+            f"今天是 {today}，請搜尋過去 24 小時內、最近 5 則與 AI 或 LLM 相關的技術新聞。\n\n"
             "請遵守以下格式規定：\n"
             "每則新聞格式範例：\n"
             "*[新聞標題]*\n"
@@ -62,9 +62,19 @@ def get_ai_news():
             )
         ]
 
-        # 啟用 Google Search 工具
-        tools = [types.Tool(googleSearch=types.GoogleSearch())]
-
+        # 啟用 Google Search 工具並設定時間區間為過去 24 小時
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        time_range = types.Interval(
+            start_time=now - timedelta(hours=24, minutes=1),
+            end_time=now
+        )
+        tools = [
+            types.Tool(
+                googleSearch=types.GoogleSearch(
+                    time_range_filter=time_range
+                )
+            )
+        ]
         config = types.GenerateContentConfig(
             thinking_config=types.ThinkingConfig(thinking_budget=-1),
             tools=tools

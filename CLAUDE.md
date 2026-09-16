@@ -73,8 +73,9 @@ uv run stock-news.py
 # Run ShopBack ISPO cashback checker
 uv run ispo-shopback.py
 
-# Run birthday notifications
+# Run birthday notifications (supports --test flag)
 uv run birthday-notify.py
+uv run birthday-notify.py --test
 
 # Run Garmin Run notification
 uv run garmin-run.py
